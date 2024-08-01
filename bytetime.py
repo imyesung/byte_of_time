@@ -117,6 +117,7 @@ class ByteTimeManager:
         # Draw menu
         menu_items = [
             "A: 작업 추가",
+            "E: 작업 수정",
             "S: 작업 시작/일시정지",
             "D: 작업 완료",
             "X: 작업 취소",
@@ -141,40 +142,27 @@ class ByteTimeManager:
             elif key == ord('a'):
                 curses.echo()
                 self.stdscr.addstr(curses.LINES - 1, 0, "새 작업 이름: ")
-                task = ""
-                while True:
-                    char = self.stdscr.get_wch()
-                    if char == '\n':
-                        break
-                    elif char == '\b' or char == curses.KEY_BACKSPACE:
-                        task = task[:-1]
-                        self.stdscr.addstr(curses.LINES - 1, len("새 작업 이름: ") + len(task), ' ')
-                        self.stdscr.move(curses.LINES - 1, len("새 작업 이름: ") + len(task))
-                    else:
-                        task += char
-                    self.stdscr.addstr(curses.LINES - 1, len("새 작업 이름: "), task)
-                    self.stdscr.refresh()
+                task = self.input_string()
                 self.stdscr.addstr(curses.LINES - 1, 0, "예상 소요 시간(분): ")
-                estimated_time_str = ""
-                while True:
-                    char = self.stdscr.get_wch()
-                    if char == '\n':
-                        break
-                    elif char == '\b' or char == curses.KEY_BACKSPACE:
-                        estimated_time_str = estimated_time_str[:-1]
-                        self.stdscr.addstr(curses.LINES - 1, len("예상 소요 시간(분): ") + len(estimated_time_str), ' ')
-                        self.stdscr.move(curses.LINES - 1, len("예상 소요 시간(분): ") + len(estimated_time_str))
-                    else:
-                        estimated_time_str += char
-                    self.stdscr.addstr(curses.LINES - 1, len("예상 소요 시간(분): "), estimated_time_str)
-                    self.stdscr.refresh()
-                try:
-                    estimated_time = int(estimated_time_str)
-                except ValueError:
-                    estimated_time = 0
+                estimated_time = self.input_number()
                 curses.noecho()
                 if task and estimated_time > 0:
                     self.add_task(task, estimated_time)
+            elif key == ord('e'):
+                curses.echo()
+                self.stdscr.addstr(curses.LINES - 1, 0, "수정할 작업 번호: ")
+                index = self.input_number()
+                if 0 <= index < len(self.tasks):
+                    self.stdscr.addstr(curses.LINES - 1, 0, "새 작업 이름: ")
+                    new_task_name = self.input_string()
+                    self.stdscr.addstr(curses.LINES - 1, 0, "새 예상 소요 시간(분): ")
+                    new_estimated_time = self.input_number()
+                    self.tasks[index]["name"] = new_task_name
+                    self.total_time -= self.tasks[index]["estimated_time"]
+                    self.tasks[index]["estimated_time"] = new_estimated_time * 60  # 분 단위를 초 단위로 변환
+                    self.total_time += new_estimated_time * 60
+                    self.log_event(f"작업 수정: {new_task_name}, 예상 시간: {new_estimated_time}분")
+                curses.noecho()
             elif key == ord('s'):
                 if self.current_task:
                     self.pause_task()
@@ -188,6 +176,40 @@ class ByteTimeManager:
                 self.selected_index = max(0, self.selected_index - 1)
             elif key == curses.KEY_DOWN:
                 self.selected_index = min(len(self.tasks) - 1, self.selected_index + 1)
+
+    def input_string(self):
+        result = ""
+        while True:
+            char = self.stdscr.get_wch()
+            if char == '\n':
+                break
+            elif char in ('\x08', '\b', '\x7f', curses.KEY_BACKSPACE):
+                if result:
+                    result = result[:-1]
+                    self.stdscr.addstr(curses.LINES - 1, len(result), ' ')
+                    self.stdscr.move(curses.LINES - 1, len(result))
+            else:
+                result += char
+            self.stdscr.addstr(curses.LINES - 1, 0, result)
+            self.stdscr.refresh()
+        return result
+
+    def input_number(self):
+        result = ""
+        while True:
+            char = self.stdscr.get_wch()
+            if char == '\n':
+                break
+            elif char in ('\x08', '\b', '\x7f', curses.KEY_BACKSPACE):
+                if result:
+                    result = result[:-1]
+                    self.stdscr.addstr(curses.LINES - 1, len(result), ' ')
+                    self.stdscr.move(curses.LINES - 1, len(result))
+            elif char.isdigit():
+                result += char
+                self.stdscr.addstr(curses.LINES - 1, len(result) - 1, char)
+            self.stdscr.refresh()
+        return int(result) if result else 0
 
 def main(stdscr):
     manager = ByteTimeManager(stdscr)
